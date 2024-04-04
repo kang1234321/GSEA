@@ -1,0 +1,63 @@
+# 加载包
+library(readxl)
+library(tidyverse)
+library(networkD3) #用于绘图
+#devtools::install_github("wch/webshot")
+library(webshot) #用于图片格式转换
+# 创造示例数据-----------------
+## 第一层数据
+data12 <- data.frame(source=sample(paste0('layer1_',1:4),50,
+                                   prob = c(0.35,0.25,0.2,0.2),replace = T),
+                     target=sample(paste0('layer2_',1:4),50,
+                                   prob = c(0.3,0.3,0.2,0.2),replace = T))
+layer12<- data12 %>%
+  group_by(source, target) %>%
+  summarise(weight = n())
+
+## 第二层数据
+data23 <- data.frame(source=data12$target,
+                     target=sample(paste0('layer3_',1:8),50,
+                                   prob = c(0.3,0.1,0.1,0.1,0.1,0.1,0.1,0.1),replace = T))
+layer23<- data23 %>%
+  group_by(source, target) %>%
+  summarise(weight = n())
+
+## 第三层数据
+data34 <- data.frame(source=data23$target,
+                     target=sample(paste0('layer4_',1:4),50,prob = c(0.4,0.2,0.2,0.2),replace = T))
+layer34<- data34 %>%
+  group_by(source, target) %>%
+  summarise(weight = n())
+
+## 合并三层数据
+pdata <- rbind(layer12,layer23)
+pdata <- rbind(pdata,layer34)
+
+# 保存示例数据
+write.csv(pdata,file = 'pdata.csv')
+# 修改为符合networkD3包要求的数据格式-------------------
+# 创建节点名称数据框
+nodes <- data.frame(name = c(as.character(pdata$source), 
+                             as.character(pdata$target)) %>% unique())
+# 把source、target转换为数字
+pdata$IDsource = match(pdata$source, nodes$name)-1
+pdata$IDtarget = match(pdata$target, nodes$name)-1
+head(pdata)
+# 正式绘图---------------------------------------
+p1 <- sankeyNetwork(Links = pdata, # 输入数据1
+                    Nodes = nodes, # 输入数据2
+                    Source = "IDsource", # 来源变量，对应的变量的数字代号
+                    Target = "IDtarget", # 接受变量，对应的变量的数字代号
+                    Value = "weight", # 关系权重
+                    NodeID = "name", #节点名称
+                    LinkGroup = 'source', # 颜色分组
+                    sinksRight = FALSE, # 设置最后一层标签位置在左/右
+                    nodeWidth = 5, #节点格子宽度
+                    fontSize = 15, #文本标签字体的大小
+                    nodePadding = 4) #节点格子间空隙宽度
+p1
+
+# 保存   
+saveNetwork(p1,"sankey.html")
+webshot("sankey.html" , "sankey.png")
+webshot("sankey.html" , "sankey.pdf")
